@@ -216,7 +216,7 @@ export interface LlmModelDiscoveryRequest {
 /**
  * One model an endpoint reports about itself. Every field but the id is
  * optional because most provider listings disclose an id and nothing else;
- * a surface adopting one of these still owes the capacities its adapter needs.
+ * a surface adopting one of these still owes metadata its adapter needs.
  */
 export interface LlmDiscoveredModel {
   /** Model id the endpoint accepts. */
@@ -227,6 +227,8 @@ export interface LlmDiscoveredModel {
   contextWindow?: number
   /** Maximum output tokens, when disclosed. */
   maxTokens?: number
+  /** Accepted input modalities, when disclosed. */
+  input?: readonly ModelModality[]
 }
 
 /** One adapter-discovered model; catalog membership is advisory, not request validation. */

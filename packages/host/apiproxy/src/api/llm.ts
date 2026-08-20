@@ -9,6 +9,7 @@
  */
 
 import type { RpcRequest, RpcResponse } from './rpc.ts'
+import type { ModelModality } from '@deepseek-ai/dsh-llm'
 import type { ModelCatalogFailure, ModelProviderGroup } from './sessions.ts'
 
 /** Wire view of one configurable provider. */
@@ -86,4 +87,6 @@ export interface DiscoveredModelView {
   contextWindow?: number
   /** Maximum output tokens, when disclosed. */
   maxTokens?: number
+  /** Accepted input modalities, when disclosed. */
+  input?: readonly ModelModality[]
 }
