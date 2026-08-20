@@ -106,11 +106,17 @@ describe('catalog-route model discovery', () => {
 })
 
 describe('draft-provider model discovery', () => {
-  it('reads an OpenAI-compatible listing and keeps the capacities it discloses', async () => {
+  it('reads an OpenAI-compatible listing and keeps the metadata it discloses', async () => {
     const server = await listingServer({
       body: JSON.stringify({
         data: [
-          { id: 'acme-large', display_name: 'Acme Large', context_length: 65_536, max_output_tokens: 4096 },
+          {
+            id: 'acme-large',
+            display_name: 'Acme Large',
+            context_length: 65_536,
+            max_output_tokens: 4096,
+            input: ['text', 'image', 'audio', 'image'],
+          },
           { id: 'acme-small' },
         ],
       }),
@@ -120,7 +126,13 @@ describe('draft-provider model discovery', () => {
     const models = await ctx.llm.discoverModels('llm-pi-ai', { baseURL: `${server.url}/v1`, apiKey: 'probe-key' })
 
     expect(models).toEqual([
-      { id: 'acme-large', name: 'Acme Large', contextWindow: 65_536, maxTokens: 4096 },
+      {
+        id: 'acme-large',
+        name: 'Acme Large',
+        contextWindow: 65_536,
+        maxTokens: 4096,
+        input: ['text', 'image'],
+      },
       { id: 'acme-small' },
     ])
     expect(server.paths).toEqual(['/v1/models'])

@@ -141,14 +141,20 @@ function capacitySpelling(value: number | undefined): string {
   return value === undefined ? '' : formatCapacity(value)
 }
 
-/** Adopt a candidate, keeping whatever capacities the provider disclosed. */
+/** Adopt a candidate, keeping every profile field the provider disclosed. */
 function adopt(candidate: LlmDiscoveredModel): ModelDraft {
   return {
     id: candidate.id,
     ...candidate.name === undefined ? {} : { name: candidate.name },
     ...candidate.contextWindow === undefined ? {} : { contextWindow: candidate.contextWindow },
     ...candidate.maxTokens === undefined ? {} : { maxTokens: candidate.maxTokens },
+    ...candidate.input === undefined ? {} : { input: [...candidate.input] },
   }
+}
+
+/** Fill metadata an existing row leaves unset without replacing user-owned values. */
+function mergeCandidate(existing: ModelDraft, candidate: LlmDiscoveredModel): ModelDraft {
+  return { ...adopt(candidate), ...existing }
 }
 
 /**
@@ -273,7 +279,8 @@ export function ModelListEditor(props: ModelListEditorProps): ReactNode {
       // Keyed by id, so a half-typed row whose id is still empty is not a
       // match and the candidate joins as its own row — correct, since a row
       // without an id is not yet a model and the create/apply gates refuse it.
-      byId.set(candidate.id, byId.get(candidate.id) ?? adopt(candidate))
+      const existing = byId.get(candidate.id)
+      byId.set(candidate.id, existing === undefined ? adopt(candidate) : mergeCandidate(existing, candidate))
     }
     onChange([...byId.values()])
     closePicker()

@@ -26,11 +26,11 @@ Choose **Add a custom provider** for a company gateway, self-hosted server, or p
 
 The Provider ID is permanent because requests, saved sessions, model defaults, and credential references use it. To rename a provider, add a new provider and delete the old one. The display name, base URL, protocol, credential, and models remain editable.
 
-Under **Model catalog**, choose **Fetch available models** to query the base URL and credential currently shown in the form. Selecting candidates updates the draft; the provider is not stored until you save. Catalog providers use their installed catalog without a network request.
+Under **Model catalog**, choose **Fetch available models** to query the base URL and credential currently shown in the form. Selecting candidates updates the draft; the provider is not stored until you save. Catalog providers use their installed catalog without a network request. A custom endpoint may also return an `input` list for each model; adopted `input: [text, image]` metadata makes that model image-capable in the Harness.
 
 ### Image input
 
-A model you enter by hand is treated as text-only until it says otherwise, because nothing can ask an endpoint which modalities it accepts. Attaching an image to such a model is refused before it is sent, naming the model.
+A model you enter by hand, or discover from an endpoint that omits `input`, is treated as text-only. Attaching an image to such a model is refused before it is sent, naming the model.
 
 A vision model on a custom provider therefore needs one line. The form has no field for it; add `input` to the model in `$DSH_HOME/settings.yaml`:
 

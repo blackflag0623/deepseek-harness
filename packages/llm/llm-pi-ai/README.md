@@ -106,7 +106,7 @@ Profiles are re-read once per operation through the optional settings seam: the 
 
 ### Discover models from endpoints
 
-The plugin answers "which models can this provider serve?" for a route a configuration surface is editing or drafting. A route the installed catalog ships is answered from that catalog with no network call; only a route the catalog does not describe is interrogated over the wire (`openai-completions` and `openai-responses` shapes). The reply is candidate metadata a surface may offer for adoption — nothing is stored, and `settings.yaml` remains the only thing that decides what a route serves.
+The plugin answers "which models can this provider serve?" for a route a configuration surface is editing or drafting. A route the installed catalog ships is answered from that catalog with no network call; only a route the catalog does not describe is interrogated over the wire (`openai-completions` and `openai-responses` shapes). Most listings disclose only an id; gateway extensions for capacities and `input` are retained when present. `input` keeps supported `text` and `image` values, drops unknown values, and becomes the adopted model's modality declaration. The reply is candidate metadata a surface may offer for adoption — nothing is stored until adoption, and `settings.yaml` remains the only thing that decides what a route serves.
 
 ### Failures and recovery
 
