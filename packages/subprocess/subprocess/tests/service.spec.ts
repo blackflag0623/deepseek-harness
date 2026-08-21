@@ -97,4 +97,29 @@ describe('SubprocessRuntime seam', () => {
       delete process.env.SCRUB_PROBE_PLAIN
     }
   })
+
+  it('scrubs the complete indexed Git config tuple instead of forwarding a malformed or secret-bearing subset', () => {
+    process.env.GIT_CONFIG_COUNT = '2'
+    process.env.GIT_CONFIG_KEY_0 = 'safe.bareRepository'
+    process.env.GIT_CONFIG_VALUE_0 = 'explicit'
+    process.env.git_config_key_1 = 'http.extraHeader'
+    process.env.git_config_value_1 = 'Authorization: secret'
+    process.env.GIT_CONFIG_GLOBAL = 'kept-outside-the-indexed-tuple'
+    try {
+      const env = scrubbedParentEnv()
+      expect(env.GIT_CONFIG_COUNT).toBeUndefined()
+      expect(env.GIT_CONFIG_KEY_0).toBeUndefined()
+      expect(env.GIT_CONFIG_VALUE_0).toBeUndefined()
+      expect(env.git_config_key_1).toBeUndefined()
+      expect(env.git_config_value_1).toBeUndefined()
+      expect(env.GIT_CONFIG_GLOBAL).toBe('kept-outside-the-indexed-tuple')
+    } finally {
+      delete process.env.GIT_CONFIG_COUNT
+      delete process.env.GIT_CONFIG_KEY_0
+      delete process.env.GIT_CONFIG_VALUE_0
+      delete process.env.git_config_key_1
+      delete process.env.git_config_value_1
+      delete process.env.GIT_CONFIG_GLOBAL
+    }
+  })
 })
