@@ -53,7 +53,12 @@ function imageContext(
   store: AttachmentStore,
   overrides: Partial<Omit<PiImageRequestContext, 'attachments'>> = {},
 ): PiImageRequestContext {
-  return { attachments: store, resolveImageAccess: () => undefined, ...overrides }
+  return {
+    attachments: store,
+    resolveImageAccess: () => undefined,
+    maxRequestImages: undefined,
+    ...overrides,
+  }
 }
 
 function request(messages: GenerateOptions['messages']): GenerateOptions {
@@ -300,6 +305,45 @@ describe('pi-ai request context conversion', () => {
           { type: 'text', text: expect.stringContaining(`Image ${sized.attachmentId}`) as string },
           { type: 'image', data: 'AQID', mimeType: 'image/png' },
         ],
+        timestamp: 0,
+      },
+    ])
+    expect(readImageRequest).toHaveBeenCalledTimes(1)
+  })
+
+  it('replaces the oldest image occurrences once the route count bound is exceeded', async () => {
+    const readImageRequest = vi.fn((value: ImageAttachmentRef) => (
+      Promise.resolve(requestImage(value, Uint8Array.of(1)))
+    ))
+    const store = projectionStore(readImageRequest)
+    const callId = ToolCallId('count-call')
+    const context = await toPiContext(request([
+      user([{
+        type: 'tool-result',
+        toolCallId: callId,
+        content: [{ type: 'image', attachment: ref }],
+      }]),
+      user([{ type: 'image', attachment: ref }]),
+      user([{ type: 'image', attachment: ref }]),
+    ]), imageContext(store, { maxRequestImages: 2 }))
+
+    expect(context.messages).toEqual([
+      {
+        role: 'toolResult',
+        toolCallId: 'count-call',
+        toolName: 'unknown',
+        content: [{ type: 'text', text: offloadedImageText(ref) }],
+        isError: false,
+        timestamp: 0,
+      },
+      {
+        role: 'user',
+        content: [expect.objectContaining({ type: 'text' }), expect.objectContaining({ type: 'image' })],
+        timestamp: 0,
+      },
+      {
+        role: 'user',
+        content: [expect.objectContaining({ type: 'text' }), expect.objectContaining({ type: 'image' })],
         timestamp: 0,
       },
     ])

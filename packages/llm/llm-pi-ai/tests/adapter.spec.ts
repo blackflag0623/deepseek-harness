@@ -309,7 +309,13 @@ describe('PiAiAdapter provider routing', () => {
     const ctx = new Context()
     await ctx.plugin(LlmRuntime)
     await ctx.plugin(LlmPiAi, {
-      providers: { openai: { apiKeyEnv: 'PI_TEST_KEY', baseURL: `${server.url}/v1` } },
+      providers: {
+        openai: {
+          apiKeyEnv: 'PI_TEST_KEY',
+          baseURL: `${server.url}/v1`,
+          maxRequestImages: 1,
+        },
+      },
     })
     await ctx.plugin(LateAttachmentStore)
     await ctx.plugin(MappedFileSystem)
@@ -318,7 +324,10 @@ describe('PiAiAdapter provider routing', () => {
       provider: 'openai',
       model: 'gpt-4.1',
       messages: [createUserMessage({
-        content: [{ type: 'image', attachment: ref }],
+        content: [
+          { type: 'image', attachment: ref },
+          { type: 'image', attachment: ref },
+        ],
         source: { kind: 'plugin', plugin: 'test' },
       })],
     })
@@ -329,6 +338,7 @@ describe('PiAiAdapter provider routing', () => {
       maxBytes: 1024 * 1024,
     }, expect.any(AbortSignal))
     expect(JSON.stringify(server.requests[0])).toContain(MODEL_IMAGE_PATH)
+    expect(JSON.stringify(server.requests[0]).match(/"input_image"/g)).toHaveLength(1)
     expect(server.paths).toEqual(['/v1/responses'])
   })
 
@@ -830,10 +840,13 @@ describe('provider profile lifecycle', () => {
     expect(() => resolveProfiles({ openai: { baseURL: '' } })).toThrow(/empty baseURL/)
     expect(() => resolveProfiles({ openai: { apiKeyEnv: 'not-a-var!' } })).toThrow(/must match/)
     expect(() => resolveProfiles({ openai: { maxRequestImageBytes: 0 } })).toThrow(/maxRequestImageBytes/)
+    expect(() => resolveProfiles({ openai: { maxRequestImages: 0 } })).toThrow(/maxRequestImages/)
     expect(resolveProfiles({ openai: {} }).get('openai')?.maxRequestImageBytes)
       .toBe(DEFAULT_MAX_REQUEST_IMAGE_BYTES)
     expect(resolveProfiles({ openai: { maxRequestImageBytes: 1024 } }).get('openai')?.maxRequestImageBytes)
       .toBe(1024)
+    expect(resolveProfiles({ openai: {} }).get('openai')?.maxRequestImages).toBeUndefined()
+    expect(resolveProfiles({ openai: { maxRequestImages: 50 } }).get('openai')?.maxRequestImages).toBe(50)
   })
 
   it.each(['maxRetries', 'maxRetryDelayMs'] as const)(
@@ -858,6 +871,9 @@ describe('provider profile lifecycle', () => {
       { maxRequestImageBytes: 0 },
       { maxRequestImageBytes: 1.5 },
       { maxRequestImageBytes: Number.NaN },
+      { maxRequestImages: 0 },
+      { maxRequestImages: 1.5 },
+      { maxRequestImages: Number.NaN },
     ]
     for (const entry of invalid) {
       const ctx = new Context()

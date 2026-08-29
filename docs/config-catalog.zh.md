@@ -1140,6 +1140,11 @@ export interface PiAiProviderProfile {
    * requests instead of being rejected by a request-size cap.
    */
   maxRequestImageBytes?: number
+  /**
+   * Maximum image occurrences per request. When history exceeds it, the
+   * oldest images become text placeholders. Omission leaves count unbounded.
+   */
+  maxRequestImages?: number
   /** Total-pixel budget for each deterministic inline request version. */
   requestImagePixelBudget?: number
   /**
