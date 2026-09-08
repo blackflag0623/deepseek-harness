@@ -16,14 +16,14 @@ import css from './ToolDetails.module.css'
 
 /**
  * Render the selected Tool call's structured output when its raw fields form a
- * supported root card, otherwise preserve the flattened result text.
+ * supported card, otherwise preserve the flattened result text.
  * @param props - selected call slice, workspace root, host home, and locale seat.
  * @returns the details output body.
  */
 export function ToolDetails({
-  block, cwd, useConnectionGeneration, t,
-}: Pick<ToolDetailsProps, 'block' | 'cwd' | 'useConnectionGeneration' | 't'>) {
-  const home = useConnectionGeneration(generation => generation?.host.home)
+  block, cwd, useHostInfo, t,
+}: Pick<ToolDetailsProps, 'block' | 'cwd' | 'useHostInfo' | 't'>) {
+  const home = useHostInfo(info => info.home)
   const terminalModel = terminalCardModel(block, cwd)
   if (terminalModel !== null) {
     const terminal = localizeTerminalCardModel(terminalModel, t)
