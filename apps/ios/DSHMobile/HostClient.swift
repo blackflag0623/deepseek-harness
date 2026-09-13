@@ -258,7 +258,10 @@ actor HostClient {
         args: [String: JSONValue],
         continuation: AsyncThrowingStream<JSONValue, Error>.Continuation
     ) async throws {
-        guard let baseURL else { throw HostClientError.invalidURL }
+        guard let baseURL else {
+            WhaleDiagnostics.console("transport", "runHttpStream failed: baseURL is nil")
+            throw HostClientError.invalidURL
+        }
         let streamId = UUID().uuidString.lowercased()
         let open: JSONValue = .object([
             "type": .string("open"),
@@ -266,39 +269,55 @@ actor HostClient {
             "endpoint": .string(endpoint),
             "payload": .object(["args": .object(args)])
         ])
-        var request = URLRequest(url: baseURL.appending(path: "api/remote.stream"))
+        let streamURL = baseURL.appending(path: "api/remote.stream")
+        var request = URLRequest(url: streamURL)
         request.httpMethod = "POST"
         request.httpBody = try encoder.encode(open)
-        request.timeoutInterval = 15
+        request.timeoutInterval = 60
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/x-ndjson", forHTTPHeaderField: "Accept")
         WhaleDiagnostics.transport.debug("opening HTTP stream \(endpoint, privacy: .public)")
-        WhaleDiagnostics.console("transport", "opening HTTP stream \(endpoint)")
+        WhaleDiagnostics.console("transport", "opening HTTP stream \(endpoint) streamId=\(streamId) url=\(streamURL.absoluteString)")
         let (bytes, response) = try await session.bytes(for: request)
         guard let http = response as? HTTPURLResponse else {
+            WhaleDiagnostics.console("transport", "HTTP stream response is not HTTPURLResponse")
             throw HostClientError.invalidResponse
         }
+        WhaleDiagnostics.console("transport", "HTTP stream response status=\(http.statusCode)")
         if http.statusCode == 404 || http.statusCode == 405 {
+            WhaleDiagnostics.console("transport", "HTTP stream unavailable (status \(http.statusCode))")
             throw HostClientError.httpStreamUnavailable
         }
         guard http.statusCode != 401 else {
+            WhaleDiagnostics.console("transport", "HTTP stream unauthenticated (401)")
             throw HostClientError.unauthenticated
         }
         guard (200..<300).contains(http.statusCode) else {
+            WhaleDiagnostics.console("transport", "HTTP stream bad status \(http.statusCode)")
             throw HostClientError.remote(
                 code: "http/\(http.statusCode)",
                 message: HTTPURLResponse.localizedString(forStatusCode: http.statusCode)
             )
         }
+        var lineCount = 0
         for try await line in bytes.lines {
             try Task.checkCancellation()
             guard !line.isEmpty else { continue }
-            try acceptRemoteFrame(
-                decoder.decode(RemoteStreamFrame.self, from: Data(line.utf8)),
-                streamId: streamId,
-                continuation: continuation
-            )
+            lineCount += 1
+            WhaleDiagnostics.console("transport", "HTTP stream line #\(lineCount) count=\(line.utf8.count) prefix=\(line.prefix(60))")
+            do {
+                let frame = try decoder.decode(RemoteStreamFrame.self, from: Data(line.utf8))
+                try acceptRemoteFrame(
+                    frame,
+                    streamId: streamId,
+                    continuation: continuation
+                )
+            } catch {
+                WhaleDiagnostics.console("transport", "acceptRemoteFrame failed error=\(error)")
+                throw error
+            }
         }
+        WhaleDiagnostics.console("transport", "HTTP stream lines loop ended normally after \(lineCount) lines, throwing streamEnded")
         throw HostClientError.streamEnded
     }
 
@@ -307,20 +326,28 @@ actor HostClient {
         streamId: String,
         continuation: AsyncThrowingStream<JSONValue, Error>.Continuation
     ) throws {
-        guard frame.streamId == streamId else { return }
+        guard frame.streamId == streamId else {
+            WhaleDiagnostics.console("transport", "acceptRemoteFrame mismatched streamId: got=\(frame.streamId) expected=\(streamId)")
+            return
+        }
         switch frame.type {
         case "item":
             if let value = frame.value {
                 continuation.yield(value)
+            } else {
+                WhaleDiagnostics.console("transport", "acceptRemoteFrame item has nil value")
             }
         case "error":
+            WhaleDiagnostics.console("transport", "acceptRemoteFrame received error: \(frame.error?.code ?? "nil") - \(frame.error?.message ?? "nil")")
             throw HostClientError.remote(
                 code: frame.error?.code ?? "gateway/internal",
                 message: frame.error?.message ?? "Remote stream failed."
             )
         case "end":
+            WhaleDiagnostics.console("transport", "acceptRemoteFrame received end frame")
             throw HostClientError.streamEnded
         default:
+            WhaleDiagnostics.console("transport", "acceptRemoteFrame unknown type=\(frame.type)")
             throw HostClientError.invalidResponse
         }
     }

@@ -361,24 +361,38 @@ final class AppStore {
                         ])
                     ]
                 )
+                WhaleDiagnostics.console("session", "follower starting stream for \(sessionId)")
                 for try await value in stream {
                     guard generation == followGeneration,
                           isApplicationActive,
-                          selectedSessionId == sessionId else { return }
-                    let frame = try await client.decode(SessionFollowFrame.self, from: value)
-                    WhaleDiagnostics.session.debug(
-                        "follower generation=\(generation) received frame"
-                    )
+                          selectedSessionId == sessionId else {
+                        WhaleDiagnostics.console("session", "follower frame dropped: stale generation/session")
+                        return
+                    }
                     WhaleDiagnostics.console(
                         "session",
-                        "follower generation=\(generation) received frame"
+                        "follower generation=\(generation) received frame value type=\(value.objectValue?["type"]?.stringValue ?? "unknown")"
                     )
-                    apply(frame)
-                    connectionState = .connected
-                    reconnectAttempt = 0
-                    delay = 1
+                    do {
+                        let frame = try await client.decode(SessionFollowFrame.self, from: value)
+                        WhaleDiagnostics.session.debug(
+                            "follower generation=\(generation) decoded frame successfully"
+                        )
+                        WhaleDiagnostics.console(
+                            "session",
+                            "follower generation=\(generation) decoded frame successfully"
+                        )
+                        apply(frame)
+                        connectionState = .connected
+                        reconnectAttempt = 0
+                        delay = 1
+                    } catch {
+                        WhaleDiagnostics.console("session", "follower generation=\(generation) decode error: \(error)")
+                        throw error
+                    }
                 }
             } catch is CancellationError {
+                WhaleDiagnostics.console("session", "follower generation=\(generation) cancelled")
                 return
             } catch {
                 guard !Task.isCancelled,
@@ -392,7 +406,7 @@ final class AppStore {
                     )
                     WhaleDiagnostics.console(
                         "session",
-                        "follower generation=\(generation) terminal domain=\(value.domain) code=\(value.code)"
+                        "follower generation=\(generation) terminal domain=\(value.domain) code=\(value.code) desc=\(error.localizedDescription)"
                     )
                     connectionState = .connected
                     isConversationLoading = false
@@ -408,7 +422,7 @@ final class AppStore {
                 )
                 WhaleDiagnostics.console(
                     "session",
-                    "follower generation=\(generation) retry domain=\(value.domain) code=\(value.code) delay=\(delay)"
+                    "follower generation=\(generation) retry domain=\(value.domain) code=\(value.code) delay=\(delay) desc=\(error.localizedDescription)"
                 )
                 try? await Task.sleep(for: .seconds(delay))
                 delay = min(delay * 2, 8)

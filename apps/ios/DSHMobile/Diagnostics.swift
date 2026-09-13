@@ -16,8 +16,18 @@ enum WhaleDiagnostics {
     }
 
     static func console(_ category: String, _ message: String) {
-        #if DEBUG
-        print("[WhaleGirl:\(category)] \(message)")
-        #endif
+        NSLog("[WhaleGirl:%@] %@", category, message)
+        switch category {
+        case "lifecycle":
+            lifecycle.notice("\(message, privacy: .public)")
+        case "transport":
+            transport.notice("\(message, privacy: .public)")
+        case "session":
+            session.notice("\(message, privacy: .public)")
+        case "interaction":
+            interaction.notice("\(message, privacy: .public)")
+        default:
+            app.notice("\(message, privacy: .public)")
+        }
     }
 }
