@@ -6,6 +6,7 @@
     "tsBuildInfoFile": "lib/tsconfig.host.tsbuildinfo"
   },
   "files": [
+    "src/http-stream.ts",
     "src/index.ts",
     "src/remote-error-codes.ts",
     "src/stream-protocol.ts",

@@ -31,9 +31,10 @@ import TypertGatewayService, {
   type TypertRemoteEventOutcome,
 } from '@deepseek-ai/dsh-api-gateway'
 import { z } from 'zod'
-import type {
-  RemoteEventClientId,
-  RemoteEventInvocationFrame,
+import {
+  REMOTE_STREAM_HTTP_PATH,
+  type RemoteEventClientId,
+  type RemoteEventInvocationFrame,
 } from '../src/stream-protocol.ts'
 
 vi.mock('node:crypto', async (importOriginal) => {
@@ -307,6 +308,32 @@ describe('Typert Remote streams', () => {
 
     socket.close()
     await once(socket, 'close')
+  })
+
+  it('serves one authenticated Remote stream over HTTP NDJSON', async () => {
+    const { ctx } = await setup(true)
+    const response = await fetch(
+      `http://127.0.0.1:${String(ctx.webServer.port)}${REMOTE_STREAM_HTTP_PATH}`,
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          cookie: browserCookie(ctx),
+        },
+        body: JSON.stringify({
+          type: 'open',
+          streamId: 'native',
+          endpoint: 'feed/sync',
+          payload: { args: { label: 'ios' } },
+        }),
+      },
+    )
+    expect(response.status).toBe(200)
+    expect((await response.text()).trim().split('\n').map(line => JSON.parse(line))).toEqual([
+      { type: 'item', streamId: 'native', value: 'ios:one' },
+      { type: 'item', streamId: 'native', value: 'ios:two' },
+      { type: 'end', streamId: 'native' },
+    ])
   })
 
   it('multiplexes independent streams over one WebSocket and propagates cancellation', async () => {

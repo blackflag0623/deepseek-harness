@@ -34,6 +34,8 @@ Connection 可用时，Host 入口会在 Connection 共享的 `/api` FetchHandle
 
 流式 Remote 使用 `@Remote({ mode: 'stream' })` 并返回 `Iterable` 或 `AsyncIterable`。`ctx.typertGateway.stream()` 执行与一元调用相同的 endpoint、参数、lookup 和取消校验，再用生成的 result codec 校验每个产出项。Client 插件激活时打开 Gateway 自有的 `/api/remote.mux` WebSocket，并让它在空闲时保持连接。Connection 拥有重试调度；每次 retry 前，它要求 mux 取消候选或活动 socket，并且只做一次全新的物理连接尝试。Host 按配置的 `websocketHeartbeatIntervalMs` 间隔（默认 2 秒）发送 Ping 控制帧，浏览器在 WebSocket 协议层自动回复 Pong，使空闲网络中间层持续看到流量，而不新增 Remote stream frame。若 socket 尚未回复上一次 Ping，Host 会在下一间隔终止它。可独立取消的逻辑流共享这条连接；进程内 Connection 载体直接提供等价的流，不打开该 WebSocket。
 
+已认证的原生客户端也可以把一个标准 Remote `open` frame 以 POST 发送到 `/api/remote.stream`。响应使用 newline-delimited JSON（换行分隔 JSON）承载相同的 `item`、`error` 与 `end` frame；关闭 HTTP 响应会中止该逻辑流，并等待其 iterator（迭代器）结束。这个单流载体服务于长连接 multiplexed WebSocket 不可靠的移动端生命周期与网络路径。它不定义第二套业务 API：两种载体都调用同一个 `wireStream.open()` dispatcher 与 failure mapper。
+
 Host 组合可通过 `registerRemoteEvents()` 注册唯一的应用事件 source。Gateway 为它保留内部 `$events` logical endpoint，只接受空 `args`，并在 source 撤回时中止该注册打开的 stream。事件名单、参数校验、每 Client 队列及 opening `{ type: 'ready', clientId, host: { home } }` frame 中的 Host home 由 API Remotes 拥有。source factory 在返回 iterable 前同步挂好增量 listener，因此 Client 只在增量投递就绪后发布 generation 并开始 baseline 读取。
 
 <a id="client-service-clientremote-ctx-key-remote"></a>

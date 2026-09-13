@@ -41,6 +41,7 @@ import {
   REMOTE_EVENT_STREAM_ENDPOINT,
   REMOTE_EVENT_STREAM_READY,
   REMOTE_EVENT_RESULT_ENDPOINT,
+  REMOTE_STREAM_HTTP_PATH,
   REMOTE_STREAM_MUX_PATH,
   isRemoteEventAgentId,
   isRemoteJsonValue,
@@ -56,6 +57,7 @@ import {
   type RemoteEventReadyFrame,
   type RemoteStreamFailure,
 } from './stream-protocol.ts'
+import { handleRemoteHttpStream } from './http-stream.ts'
 
 export type {
   InvokeRemoteRequest,
@@ -200,6 +202,15 @@ export class TypertGatewayService extends Service implements TypertGateway {
         '/api',
         endpoint => this.claimsEndpoint(endpoint),
         (endpoint, payload, signal) => this.dispatchRpc(endpoint, payload, signal),
+      )
+      connectionCtx.effect(
+        () => connectionCtx.connection.fetch.register({
+          path: REMOTE_STREAM_HTTP_PATH,
+          methods: ['POST'],
+          requestBody: 'buffered',
+          fetch: request => handleRemoteHttpStream(this.wireStream, request),
+        }),
+        `api-gateway: ${REMOTE_STREAM_HTTP_PATH} HTTP stream`,
       )
     })
     ctx.inject(['connection', 'webServer'], (webCtx) => {

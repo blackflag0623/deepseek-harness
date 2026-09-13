@@ -5,6 +5,9 @@ import type { Branded } from '@deepseek-ai/dsh-brand'
 /** Exact WebSocket route carrying every Typert Remote stream. */
 export const REMOTE_STREAM_MUX_PATH = '/api/remote.mux'
 
+/** Exact authenticated HTTP route carrying one Remote stream as NDJSON. */
+export const REMOTE_STREAM_HTTP_PATH = '/api/remote.stream'
+
 /** Gateway-internal logical stream carrying application-selected Cordis events. */
 export const REMOTE_EVENT_STREAM_ENDPOINT = '$events'
 
