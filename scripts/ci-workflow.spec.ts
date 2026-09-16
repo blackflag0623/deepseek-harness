@@ -172,6 +172,8 @@ describe('CI workflow', () => {
       expect(job['runs-on']).toContain('self-hosted')
       expect(job['runs-on']).toContain('dsh-win-ci')
       expect(job['runs-on']).toContain('dsh-windows-2025-16core')
+      expect(job['runs-on']).toContain("github.repository == 'deepseek-harness/deepseek-harness'")
+      expect(job['runs-on']).toContain('windows-2025')
       expect(job.if).toBe("github.event_name == 'pull_request'")
     }
 
@@ -310,10 +312,29 @@ describe('CI workflow', () => {
       expect(job['runs-on'], `${jobName} runs-on must use the Linux failover switch`).toContain('DSH_CI_FAILOVER_LINUX')
       expect(job['runs-on'], `${jobName} runs-on must not use the Windows failover switch`).not.toContain('DSH_CI_FAILOVER_WINDOWS')
       expect(job['runs-on']).toContain('vm-backup')
+      expect(job['runs-on']).toContain("github.repository == 'deepseek-harness/deepseek-harness'")
+      expect(job['runs-on']).toContain('dsh-ubuntu-24-04-16core')
+      expect(job['runs-on']).toContain('ubuntu-24.04')
     }
     expect(aggregate['runs-on']).toContain('DSH_CI_FAILOVER_LINUX')
     expect(aggregate['runs-on']).not.toContain('DSH_CI_FAILOVER_WINDOWS')
     expect(aggregate['runs-on']).toContain('vm-backup')
+    expect(aggregate['runs-on']).toContain("github.repository == 'deepseek-harness/deepseek-harness'")
+    expect(aggregate['runs-on']).toContain('ubuntu-latest')
+
+    const hostedCondition = "github.repository != 'deepseek-harness/deepseek-harness'"
+    for (const [jobName, job] of [['node-24', node24], ['node-24-coverage', node24Coverage], ['node-24-consumers', node24Consumers]] as const) {
+      const steps = job.steps as unknown[]
+      const hostedSteps = steps.filter((step): step is Record<string, unknown> & { if: string } => (
+        isRecord(step) && typeof step.if === 'string'
+        && (step.uses === 'actions/cache/restore@v4'
+          || step.name === 'Install Playwright Chromium and hosted dependencies')
+      ))
+      expect(hostedSteps.length, `${jobName} must retain hosted-only setup`).toBeGreaterThan(0)
+      for (const step of hostedSteps) {
+        expect(step.if, `${jobName} hosted setup must admit forks`).toContain(hostedCondition)
+      }
+    }
 
     // The run-gates aggregate lanes stop at the first blocking gate failure so
     // a red aggregate does not keep burning runner time on the remaining
