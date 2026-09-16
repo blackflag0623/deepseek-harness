@@ -66,11 +66,13 @@ export class HostConnectionService extends Service implements HostConnectionHand
    * @param ctx - owning Connection plugin context.
    * @param trustedHosts - deployment authorities accepted by the Host/Origin fence.
    * @param browserAuth - process token and persistent browser-session owner.
+   * @param browserAuthentication - whether trusted requests require a browser session.
    */
   constructor(
     ctx: Context,
     private readonly trustedHosts: readonly string[],
     private readonly browserAuth: BrowserAuth,
+    private readonly browserAuthentication: 'required' | 'disabled' = 'required',
   ) {
     super(ctx, 'connection')
   }
@@ -93,19 +95,28 @@ export class HostConnectionService extends Service implements HostConnectionHand
     }
   }
 
-  /** Apply the configured Host/Origin fence, then browser authentication. */
+  /** Apply the Host/Origin fence, then the configured browser identity policy. */
   requestRejection(request: ConnectionTrustRequest): ConnectionRequestRejection {
     if (!isTrustedApiRequest(request, this.trustedHosts)) return 403
+    if (this.browserAuthentication === 'disabled') return undefined
     return this.browserAuth.isAuthenticated(request) ? undefined : 401
   }
 
-  /** Authenticate an index request through the process-token exchange or cookie. */
+  /** Apply the configured browser identity policy to an index request. */
   authorizeIndex(request: ConnectionIndexRequest, response: ConnectionIndexResponse): boolean {
+    if (this.browserAuthentication === 'disabled') return true
     return this.browserAuth.authorizeIndex(request, response)
   }
 
-  /** Add this process's launch token to the clean application URL. */
+  /** Produce the application URL required by the configured browser identity policy. */
   authenticatedUrl(baseUrl: string): string {
+    if (this.browserAuthentication === 'disabled') {
+      const url = new URL(baseUrl)
+      url.pathname = '/'
+      url.search = ''
+      url.hash = ''
+      return url.href
+    }
     return this.browserAuth.authenticatedUrl(baseUrl)
   }
 

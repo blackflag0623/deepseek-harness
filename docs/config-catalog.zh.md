@@ -353,6 +353,12 @@ export interface ConnectionConfig {
   /** Browser recovery timing, injected into each served page. */
   recovery?: ConnectionRecoveryConfig
   /**
+   * Browser identity policy for index and API requests. Disabling it grants
+   * every request that passes the Host/Origin trust checks the complete
+   * tool-capable Host authority. Default: `required`.
+   */
+  browserAuthentication?: 'required' | 'disabled'
+  /**
    * Authorities this deployment serves beyond loopback: exact `host:port`, or
    * port-less `host` matching any port. The /api trust fence refuses any
    * request whose Host is neither loopback nor listed here, so a

@@ -73,6 +73,12 @@ export interface ConnectionConfig {
   /** Browser recovery timing, injected into each served page. */
   recovery?: ConnectionRecoveryConfig
   /**
+   * Browser identity policy for index and API requests. Disabling it grants
+   * every request that passes the Host/Origin trust checks the complete
+   * tool-capable Host authority. Default: `required`.
+   */
+  browserAuthentication?: 'required' | 'disabled'
+  /**
    * Authorities this deployment serves beyond loopback: exact `host:port`, or
    * port-less `host` matching any port. The /api trust fence refuses any
    * request whose Host is neither loopback nor listed here, so a
@@ -89,6 +95,10 @@ export interface ConnectionConfig {
 
 export const Config: z<ConnectionConfig> = z.object({
   recovery: ConnectionRecoveryConfigSchema.default({}),
+  browserAuthentication: z.union([
+    z.const('required'),
+    z.const('disabled'),
+  ]).default('required'),
   trustedHosts: z.array(String).default([]),
   cookieMaxAgeDays: z.natural().min(1).default(30),
   maxRequestBodyBytes: z.natural().min(1).default(DEFAULT_MAX_REQUEST_BODY_BYTES),
@@ -97,13 +107,14 @@ export const Config: z<ConnectionConfig> = z.object({
 /**
  * Provides carrier-neutral RPC and Fetch registries. When `webServer` is
  * present, the plugin also mounts the `/api` browser transport with Host/Origin
- * checks and persistent browser authentication.
+ * checks and the configured browser identity policy.
  * @param ctx - Host plugin context.
  * @param config - resolved plugin config (schema defaults applied).
  */
 export async function apply(ctx: Context, config?: ConnectionConfig): Promise<void> {
   const recovery = resolveConnectionConfig(config?.recovery)
   // The Loader resolves schema defaults; hand-built test contexts may pass none.
+  const browserAuthentication = config?.browserAuthentication ?? 'required'
   const trustedHosts = config?.trustedHosts ?? []
   const cookieMaxAgeDays = config?.cookieMaxAgeDays ?? 30
   const maxRequestBodyBytes = config?.maxRequestBodyBytes ?? DEFAULT_MAX_REQUEST_BODY_BYTES
@@ -115,6 +126,7 @@ export async function apply(ctx: Context, config?: ConnectionConfig): Promise<vo
     ctx,
     trustedHosts,
     await BrowserAuth.create(ctx.root, ctx.credentials, cookieMaxAgeDays),
+    browserAuthentication,
   )
   ctx.inject(['webServer'], (webCtx) => {
     assertImageBodyCapacity(webCtx, maxRequestBodyBytes)

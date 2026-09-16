@@ -7,7 +7,7 @@ import { request as httpRequest } from 'node:http'
 import { createRequire } from 'node:module'
 import { createServer } from 'node:net'
 import type { AddressInfo } from 'node:net'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -65,11 +65,17 @@ function cleanEnvironment(root: string, dshHome: string): NodeJS.ProcessEnv {
 }
 
 /** Start the public source CLI and wait for its authenticated readiness URL. */
-async function startWeb(root: string, dshHome: string, port: number): Promise<RunningWeb> {
+async function startWeb(
+  root: string,
+  dshHome: string,
+  port: number,
+  patches: readonly string[] = [],
+): Promise<RunningWeb> {
   const child = spawn(process.execPath, [
     '--import', TSX_LOADER,
     DSH_SOURCE_BIN,
     'web',
+    ...patches.flatMap(patch => ['--patch', patch]),
     '--no-open',
     '--port', String(port),
   ], {
@@ -78,45 +84,54 @@ async function startWeb(root: string, dshHome: string, port: number): Promise<Ru
     stdio: ['ignore', 'pipe', 'pipe'],
   })
   let output = ''
-  const launchUrl = await new Promise<string>((resolve, reject) => {
-    let settled = false
-    const fail = (error: Error): void => {
-      if (settled) return
-      settled = true
-      clearTimeout(timer)
-      reject(error)
-    }
-    const timer = setTimeout(() => {
-      fail(new Error(`dsh web did not become ready:\n${redact(output)}`))
-    }, 90_000)
-    const append = (chunk: Buffer | string): void => {
-      output = `${output}${String(chunk)}`.slice(-100_000)
-      const match = /dsh web: (http:\/\/[^\s]+)/u.exec(output)
-      if (settled || match?.[1] === undefined) return
-      settled = true
-      clearTimeout(timer)
-      resolve(match[1])
-    }
-    child.stdout?.on('data', append)
-    child.stderr?.on('data', append)
-    child.once('error', (error) => {
-      fail(error)
+  try {
+    const launchUrl = await new Promise<string>((resolve, reject) => {
+      let settled = false
+      const fail = (error: Error): void => {
+        if (settled) return
+        settled = true
+        clearTimeout(timer)
+        reject(error)
+      }
+      const timer = setTimeout(() => {
+        fail(new Error(`dsh web did not become ready:\n${redact(output)}`))
+      }, 90_000)
+      const append = (chunk: Buffer | string): void => {
+        output = `${output}${String(chunk)}`.slice(-100_000)
+        const match = /dsh web: (http:\/\/[^\s]+)/u.exec(output)
+        if (settled || match?.[1] === undefined) return
+        settled = true
+        clearTimeout(timer)
+        resolve(match[1])
+      }
+      child.stdout?.on('data', append)
+      child.stderr?.on('data', append)
+      child.once('error', (error) => {
+        fail(error)
+      })
+      child.once('exit', (code) => {
+        fail(new Error(`dsh web exited before readiness (${String(code)}):\n${redact(output)}`))
+      })
     })
-    child.once('exit', (code) => {
-      fail(new Error(`dsh web exited before readiness (${String(code)}):\n${redact(output)}`))
-    })
-  })
-  return { child, launchUrl, output: () => output }
+    return { child, launchUrl, output: () => output }
+  } catch (error) {
+    await stopChild(child)
+    throw error
+  }
 }
 
-async function stopWeb(running: RunningWeb): Promise<void> {
-  if (running.child.exitCode !== null) return
-  const exited = new Promise<void>((resolve) => { running.child.once('exit', () => { resolve() }) })
-  running.child.kill('SIGTERM')
-  const forced = setTimeout(() => { running.child.kill('SIGKILL') }, 10_000)
+async function stopChild(child: ChildProcess): Promise<void> {
+  if (child.exitCode !== null) return
+  const exited = new Promise<void>((resolve) => { child.once('exit', () => { resolve() }) })
+  child.kill('SIGTERM')
+  const forced = setTimeout(() => { child.kill('SIGKILL') }, 10_000)
   forced.unref()
   await exited
   clearTimeout(forced)
+}
+
+async function stopWeb(running: RunningWeb): Promise<void> {
+  await stopChild(running.child)
 }
 
 /** POST one real Remote envelope while controlling the wire Host header. */
@@ -152,6 +167,42 @@ function describeSettings(port: number, host: string, cookie?: string): Promise<
 }
 
 describe('dsh web authentication through the real CLI', () => {
+  it('supports an explicit authentication opt-out while retaining request trust', { timeout: 120_000 }, async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-web-no-auth-real-cli-'))
+    const dshHome = join(root, '.dsh')
+    const patch = join(root, 'no-auth.patch.yml')
+    let running: RunningWeb | undefined
+    try {
+      await writeFile(patch, [
+        '- id: connection',
+        '  config:',
+        '    browserAuthentication: disabled',
+        '',
+      ].join('\n'))
+      running = await startWeb(root, dshHome, 0, [patch])
+      const launchUrl = new URL(running.launchUrl)
+      const port = Number(launchUrl.port)
+      expect(launchUrl.search).toBe('')
+
+      const response = await describeSettings(port, launchUrl.host)
+      expect(response.status).toBe(200)
+      expect(JSON.parse(response.body)).toMatchObject({
+        type: 'server-response',
+        rpcId: 'web-auth-real-cli',
+        result: { ok: true },
+      })
+      expect((await describeSettings(port, 'other.example')).status).toBe(403)
+    } catch (error) {
+      throw new Error(
+        `${error instanceof Error ? error.message : String(error)}\n${redact(running?.output() ?? '')}`,
+        { cause: error },
+      )
+    } finally {
+      if (running !== undefined) await stopWeb(running)
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('rejects a forged loopback Host and preserves the browser cookie across restart', { timeout: 180_000 }, async () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-web-auth-real-cli-'))
     const dshHome = join(root, '.dsh')

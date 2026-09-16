@@ -120,7 +120,7 @@ export interface ConnectionFetchRoute {
   readonly methods: readonly ConnectionFetchMethod[]
   /** Buffered requests obey the configured JSON cap; streaming requests arrive with backpressure and no aggregate cap. */
   readonly requestBody: ConnectionRequestBodyMode
-  /** Handle one request after the physical carrier has applied its trust and authentication policy. */
+  /** Handle one request after the physical carrier has applied its trust and browser identity policy. */
   readonly fetch: (request: Request) => Promise<Response>
 }
 
@@ -137,7 +137,7 @@ export interface HostConnectionFetch {
 /** Host registry for logical RPC channels carried by the current transport. */
 export interface HostConnectionRpc {
   /**
-   * Register one authenticated absolute channel prefix.
+   * Register one policy-admitted absolute channel prefix.
    * @param channel - absolute logical channel such as `/rpc`.
    * @param handler - decoded endpoint handler returning the existing RPC result shape.
    * @returns asynchronous disposer removing the channel and its physical route.
@@ -171,12 +171,12 @@ export interface HostConnectionHandle {
   /**
    * Compose exact Fetch routes and the shared-channel RPC interceptor.
    * @param channel - shared channel mounted by Connection.
-   * @returns Fetch handler for trusted, authenticated requests.
+   * @returns Fetch handler for requests admitted by the physical carrier.
    */
   createSharedFetchHandler(channel: '/api'): ConnectionFetchHandler
 
   /**
-   * Apply Connection's Host/Origin checks and browser authentication to
+   * Apply Connection's Host/Origin checks and browser identity policy to
    * another Web route.
    * @param request - request headers from the HTTP or upgrade request.
    * @returns rejection status, or undefined when the route may accept the request.
@@ -184,7 +184,7 @@ export interface HostConnectionHandle {
   requestRejection(request: ConnectionTrustRequest): ConnectionRequestRejection
 
   /**
-   * Authenticate one frontend index request, owning a token redirect or 401.
+   * Apply the browser identity policy to one frontend index request.
    * @param request - root or configured-index HTTP request.
    * @param response - response owned when the result is false.
    * @returns true only when the frontend may serve index.html.
@@ -192,7 +192,7 @@ export interface HostConnectionHandle {
   authorizeIndex(request: ConnectionIndexRequest, response: ConnectionIndexResponse): boolean
 
   /**
-   * Add the fresh process token to an ordinary Web application URL.
+   * Produce the root URL required by the configured browser identity policy.
    * @param baseUrl - clean canonical browser origin.
    * @returns root URL accepted by {@link authorizeIndex} for initial login.
    */
@@ -209,7 +209,7 @@ export interface ConnectionFetchHandler {
   requestBodyMode(request: { readonly method: string; readonly url: URL }): ConnectionRequestBodyMode
 
   /**
-   * Dispatch one already-authenticated request.
+   * Dispatch one request already admitted by the physical carrier.
    * @param request - Fetch request below the shared channel.
    * @returns the registered response or a 404 response.
    */
