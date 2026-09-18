@@ -390,6 +390,7 @@ function nodeCompatSmokeGates(options: { cliSmoke?: boolean } = {}): Gate[] {
       'vitest',
       'run',
       'packages/boot/app-boot/tests/profile-resolution.spec.ts',
+      'packages/boot/app-boot/tests/profile-resolution-source.spec.ts',
       'packages/boot/app-boot/tests/profile-resolution-service.spec.ts',
       'packages/boot/app-boot/tests/profile-resolution-worker-bootstrap.spec.ts',
     ], { label: 'profile resolution smoke' }),
