@@ -278,6 +278,30 @@ describe('connection node half', () => {
     await dispose()
   })
 
+  it('can explicitly disable browser authentication without disabling request trust', async () => {
+    const { routes, connection, dispose } = await mounted({
+      browserAuthentication: 'disabled',
+      trustedHosts: ['harness.example'],
+    })
+    const index = fakeResponse()
+
+    expect(connection.authenticatedUrl('http://harness.example/path?old=value#hash'))
+      .toBe('http://harness.example/')
+    expect(connection.authorizeIndex(fakeRequest({ host: 'harness.example' }), index.response))
+      .toBe(true)
+    expect(index.state).toEqual({})
+    expect(connection.requestRejection(fakeRequest({ host: 'harness.example' }))).toBeUndefined()
+    expect(connection.requestRejection(fakeRequest({ host: 'other.example' }))).toBe(403)
+
+    const allowed = fakeResponse()
+    await routes[0]!.handler(
+      fakeRequest({ host: 'harness.example' }, `${API_PATH}/skills/list`),
+      allowed.response,
+    )
+    expect(allowed.state.status).toBe(404)
+    await dispose()
+  })
+
   it('provides a disposable dedicated RPC channel', async () => {
     const ctx = new Context()
     const routes: WebRoute[] = []

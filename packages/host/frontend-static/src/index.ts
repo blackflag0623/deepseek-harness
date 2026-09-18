@@ -4,7 +4,7 @@
  * entry points. A readable index renders at the dist root and configured index
  * path; missing paths return 404, traversal outside the dist root is 403,
  * unknown extensions ship as octet-stream, and non-GET/HEAD is 405. Every
- * index response first passes Connection's browser authentication, then the
+ * index response first passes Connection's browser identity policy, then the
  * webserver's index render (structured injection rows, then raw taps).
  * Non-index assets stay public. The dist location is workspace knowledge of
  * the composing application, so `distIndex` is typically supplied through a
@@ -64,7 +64,7 @@ const STATIC_MISS_CODES: ReadonlySet<string | undefined> = new Set([
  * @param res - the node:http response to write.
  * @param distRoot - absolute dist root directory (resolved by the caller).
  * @param distIndex - absolute path of index.html inside distRoot.
- * @param authorizeIndex - authenticates an index response before its bytes are read.
+ * @param authorizeIndex - applies the browser identity policy before index bytes are read.
  * @param renderIndex - produces the index.html body (structured injection
  * rendering) for the dist root and configured index path.
  */
