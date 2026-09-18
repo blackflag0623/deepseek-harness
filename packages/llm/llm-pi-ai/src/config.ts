@@ -164,15 +164,14 @@ export interface PiAiProviderProfile {
   /** Maximum provider idle time while one stream read is outstanding. */
   streamIdleTimeoutMs?: number
   /**
-   * Maximum base64-encoded image payload per request. When a request's
-   * accumulated images exceed it, the oldest images are replaced by text
-   * placeholders until the request fits, so a long session keeps completing
-   * requests instead of being rejected by a request-size cap.
+   * Maximum base64-encoded image payload per request. A request whose retained
+   * images exceed it fails with `IMAGE_OFFLOAD_REQUIRED` so the image-offload
+   * plugin can record the oldest occurrences before retrying.
    */
   maxRequestImageBytes?: number
   /**
-   * Maximum image occurrences per request. When history exceeds it, the
-   * oldest images become text placeholders. Omission leaves count unbounded.
+   * Maximum retained image occurrences per request. Exceeding it fails with
+   * `IMAGE_OFFLOAD_REQUIRED`; omission leaves count unbounded.
    */
   maxRequestImages?: number
   /** Total-pixel budget for each deterministic inline request version. */

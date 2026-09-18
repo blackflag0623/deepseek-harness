@@ -228,13 +228,13 @@ function readListing(body: unknown): LlmDiscoveredModel[] {
       entry?.limit?.output,
       entry?.top_provider?.max_completion_tokens,
     )
-    const input = modalities(entry?.input)
+    const inputModalities = modalities(entry?.input)
     models.push({
       id,
       name,
       ...contextWindow === undefined ? {} : { contextWindow },
       ...maxTokens === undefined ? {} : { maxTokens },
-      ...input === undefined ? {} : { input },
+      ...inputModalities === undefined ? {} : { inputModalities },
     })
   }
   return models
@@ -291,6 +291,7 @@ export async function discoverModels(
         name: model.name,
         contextWindow: model.contextWindow,
         maxTokens: model.maxTokens,
+        inputModalities: [...model.input],
       }))
     }
   }
